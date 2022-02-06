@@ -1,0 +1,517 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>Little Squirrel</title>
+    <script src="//cdn.jsdelivr.net/npm/phaser@3.11.0/dist/phaser.js"></script>
+    <style type="text/css">
+        body {
+            margin: 0;
+        }
+    </style>
+</head>
+
+
+<body>
+    <script type="text/javascript">
+
+        var config = {
+            type: Phaser.AUTO,
+            width: 1080, height: 610, //ratio 16:9
+            physics: {
+                default: 'arcade',
+                arcade: {
+                    gravity: { y: 300 },
+                    debug: false
+                }
+            },
+            scene: { preload: preload, create: create, update: update },
+            input: { gamepad: true }
+        };
+        new Phaser.Game(config);
+        function preload() {
+
+            // load de tous les sprites et assets qui seront utilisés dans le jeu
+
+            this.load.image('sky', 'assets/background.png');
+            this.load.image('clouds', 'assets/nuages.png');
+            this.load.image('sky_back', 'assets/ciel.png');
+            this.load.image('ground', 'assets/platform.png');
+            this.load.image('snow', 'assets/neige.png');
+            this.load.image('ice', 'assets/glace.png');
+            this.load.image('gland', 'assets/gland.png');
+            this.load.image('pics', 'assets/pics.png');
+            this.load.spritesheet('perso', 'assets/sprite_ecureuil_sheet.png', { frameWidth: 32, frameHeight: 32 }); //les éléments entre {} nous permettent de déterminer la taille d'une frame, qui sera utile pour les animations
+            this.load.spritesheet('monster', 'assets/monster.png', { frameWidth: 64, frameHeight: 32 })
+            this.load.spritesheet('health', 'assets/vie.png', { frameWidth: 350, frameHeight: 64 })
+        };
+
+        //déclaration de toutes les variables qui seront utilisées
+
+        var platforms;
+        var player;
+        var cursors;
+        var gameOver = false;
+        var doubleJump = false;
+        var manette;
+        var isConnected = false;
+        var isOnSnow = false;
+        var isOnGround = false;
+        var isOnIce = false;
+        var glandCollected = false;
+        var ennemysIsPresent = true;
+        var pv = 3;
+        var monstreRight = true;
+        var monstreLeft = false;
+        var pressLeft = false;
+        var pressRight = false;
+        var invincible = false;
+
+        function create() {
+            //création du background avec différents layers et scroll factors pour l'effet parallaxe
+            this.add.tileSprite(540, 2880, 1080, 5760, 'sky_back').setScrollFactor(0.80);
+            this.add.tileSprite(540, 2880, 1080, 5760, 'sky');
+            this.add.tileSprite(540, 2880, 1080, 5760, 'clouds').setScrollFactor(0.90);
+
+
+
+            //on définit les limites du monde
+            this.physics.world.setBounds(0, 0, 1080, 5760);
+
+            //création des plateformes normales
+            platforms = this.physics.add.staticGroup();
+            platforms.create(1100, 450, 'ground');
+            platforms.create(1000, 800, 'ground');
+            platforms.create(600, 900, 'ground');
+            platforms.create(600, 1150, 'ground');
+            platforms.create(900, 1300, 'ground');
+            platforms.create(50, 1400, 'ground');
+            platforms.create(600, 1500, 'ground');
+            platforms.create(1000, 1600, 'ground');
+            platforms.create(50, 1700, 'ground');
+            platforms.create(600, 1800, 'ground');
+            platforms.create(900, 1900, 'ground');
+            platforms.create(100, 2000, 'ground');
+            platforms.create(600, 2100, 'ground');
+            platforms.create(1000, 2200, 'ground');
+            platforms.create(50, 2300, 'ground');
+            platforms.create(600, 2400, 'ground');
+            platforms.create(1000, 2500, 'ground');
+            platforms.create(50, 2600, 'ground');
+            platforms.create(600, 2700, 'ground');
+            platforms.create(1000, 2800, 'ground');
+            platforms.create(50, 2900, 'ground');
+            platforms.create(600, 3000, 'ground');
+            platforms.create(1000, 3100, 'ground');
+            platforms.create(50, 3200, 'ground');
+            platforms.create(600, 3300, 'ground');
+            platforms.create(1000, 3400, 'ground');
+            platforms.create(50, 3500, 'ground');
+            platforms.create(600, 3600, 'ground');
+            platforms.create(1000, 3700, 'ground');
+            platforms.create(200, 3800, 'ground');
+            platforms.create(600, 3900, 'ground');
+            platforms.create(800, 4000, 'ground');
+            platforms.create(50, 4100, 'ground');
+            platforms.create(600, 4200, 'ground');
+            platforms.create(800, 4300, 'ground');
+            platforms.create(50, 4400, 'ground');
+            platforms.create(600, 4500, 'ground');
+            platforms.create(1000, 4600, 'ground');
+            platforms.create(200, 4700, 'ground');
+            platforms.create(600, 5000, 'ground');
+            platforms.create(1000, 4850, 'ground');
+            platforms.create(50, 5150, 'ground');
+            platforms.create(500, 5300, 'ground');
+
+
+            //création des plateformes de neige
+            neige = this.physics.add.staticGroup();
+            neige.create(50, 700, 'snow');
+            neige.create(900, 5420, 'snow');
+
+            //création des plateformes de glace
+            glace = this.physics.add.staticGroup();
+            glace.create(500, 5640, 'ice').setScale(3).refreshBody();
+            glace.create(500, 5520, 'ice');
+            glace.create(600, 600, 'ice');
+            glace.create(50, 1000, 'ice');
+
+            //création des pics
+            pics = this.physics.add.staticGroup();
+            pics.create(700, 570, 'pics');
+            pics.create(500, 5490, 'pics');
+
+
+            //création du joueur
+            player = this.physics.add.sprite(100, 5550, 'perso');
+            player.setBounce(0.2); //le joueur rebondit légérement à l'aterrissage
+            player.setCollideWorldBounds(true); //le joueur ne peut pas dépasser les limites du monde
+
+            //création des collisions entre le joueur et les différents types de plateforme
+            this.physics.add.collider(player, platforms, onGround, null, this);
+            this.physics.add.collider(player, neige, onSnow, null, this);
+            this.physics.add.collider(player, glace, onIce, null, this);
+            //et avec les pics
+            this.physics.add.collider(pics, player, hitPics, null, this);
+
+            //création du monstre
+            monstre = this.physics.add.sprite(600, 5500, 'monster');
+            monstre.setBounce(0.1);
+
+            this.physics.add.collider(monstre, glace); //collision du monstre avec la plateforme de glace
+            this.physics.add.collider(player, monstre, hitMonstre, null, this); //collision entre le monstre et le joueur
+
+            //création de l'item power-up (permet de double-sauter)
+            gland = this.physics.add.group();
+            gland.create(900, 5350, 'gland');
+            this.physics.add.collider(gland, neige);
+            this.physics.add.overlap(gland, player, collectGland, null, this);
+
+            //création de la caméra principale, qui suit le joueur
+            this.cameras.main.setBounds(0, 0, 1080, 5760);
+            this.cameras.main.startFollow(player);
+
+            //création de la barre de vie
+            vie = this.add.sprite(200, 50, 'health').setScrollFactor(0); //le scroll factor 0 lui permet de rester constamment à l'écran
+
+            //création des différents animations 
+            this.anims.create({
+                key: 'left',
+                frames: this.anims.generateFrameNumbers('perso', { start: 0, end: 2 }),
+                frameRate: 10,
+                repeat: -3
+            });
+            this.anims.create({
+                key: 'turn',
+                frames: [{ key: 'perso', frame: 3 }],
+                frameRate: 20
+            });
+            this.anims.create({
+                key: 'right',
+                frames: this.anims.generateFrameNumbers('perso', { start: 4, end: 6 }),
+                frameRate: 10,
+                repeat: -1
+            });
+
+            this.anims.create({
+                key: 'eyes',
+                frames: this.anims.generateFrameNumbers('monster', { start: 0, end: 11 }),
+                frameRate: 10,
+                repeat: -1
+            });
+
+            this.anims.create({
+                key: 'pv3',
+                frames: this.anims.generateFrameNumbers('health', { start: 0, end: 0 }),
+                frameRate: 10,
+                repeat: -1
+            });
+            this.anims.create({
+                key: 'pv2',
+                frames: this.anims.generateFrameNumbers('health', { start: 1, end: 1 }),
+                frameRate: 10,
+                repeat: -1
+            });
+            this.anims.create({
+                key: 'pv1',
+                frames: this.anims.generateFrameNumbers('health', { start: 2, end: 2 }),
+                frameRate: 10,
+                repeat: -1
+            });
+            this.anims.create({
+                key: 'pv0',
+                frames: this.anims.generateFrameNumbers('health', { start: 3, end: 3 }),
+                frameRate: 10,
+                repeat: -1
+            });
+
+            //création des contrôles clavier
+            cursors = this.input.keyboard.addKeys('Z,Q,S,D');
+
+
+        }
+
+
+        function hitMonstre(player, monstre) {
+            //fonction appelée quand on touche le monstre, changement de couleur et perte de pvs + 1s d'invincibilité après avoir été touché
+            if (!invincible) {
+                invincible = true;
+                player.setTint(0xff0000);
+                player.anims.play('turn');
+                pv = pv - 1;
+                setTimeout(() => {
+                    player.clearTint()
+                    invincible = false;
+                }, 1000);
+            }
+
+        }
+
+        function hitPics(player, pics) {
+            //fonction appelée quand on touche les pics, mort immédiate
+            player.setTint(0xff0000);
+            player.anims.play('turn');
+            pv = 0;
+            gameOver = true;
+        }
+
+        function collectGland(player, gland) {
+            //fonction qui permet de ramasser le gland
+            gland.destroy();
+            glandCollected = true;
+        }
+
+        //trois fonctions qui servent à déterminer sur quel type de sol on se trouve
+        function onSnow() {
+            isOnIce = false;
+            isOnGround = false;
+            isOnSnow = true;
+        }
+
+        function onGround() {
+            isOnIce = false;
+            isOnSnow = false;
+            isOnGround = true;
+        }
+
+        function onIce() {
+            isOnGround = false;
+            isOnSnow = false;
+            isOnIce = true;
+        }
+
+        function doubleJumpKeyboard() {
+            //fonction qui permet le double saut
+            const didPressJump = Phaser.Input.Keyboard.JustDown(cursors.Z); //just down au lieu de is down pour vérifier si le bouton vient d'être pressé
+            if (didPressJump) {
+                if (player.body.touching.down) {
+                    player.setVelocityY(-250);
+                    doubleJump = true; //le double saut est possible
+
+                }
+                else if (doubleJump) {
+                    doubleJump = false;
+                    player.setVelocityY(-250);
+                }
+
+            }
+        }
+
+
+        function update() {
+
+            if (gameOver) { return; } //on ne peut plus rien faire quand il y a game over
+
+            this.input.gamepad.once('connected', function (pad) {
+                //détermine si la manette est connectée
+                manette = pad;
+                isConnected = true;
+            });
+
+            if (ennemysIsPresent) {
+                //gère le pattern du monstre et son animation
+                if (monstre.x < 400) {
+                    monstreRight = true;
+                    monstreLeft = false;
+
+                }
+                if (monstre.x > 900) {
+                    monstreLeft = true;
+                    monstreRight = false;
+
+                }
+
+                if (monstreRight) {
+                    monstre.setVelocityX(100);
+                    monstre.anims.play('eyes', true);
+                }
+                if (monstreLeft) {
+                    monstre.setVelocityX(-100);
+                    monstre.anims.play('eyes', true);
+                }
+
+            }
+
+            //gère le changement d'apparence de la barre de pv en fonction des pvs du joueur
+            if (pv == 3) {
+                vie.anims.play('pv3', true)
+            }
+            else if (pv == 2) {
+                vie.anims.play('pv2', true)
+            }
+            else if (pv == 1) {
+                vie.anims.play('pv1', true)
+            }
+            else {
+                vie.anims.play('pv0', true)
+                gameOver = true; //si les pvs sont à 0, game over
+            }
+
+            if (isConnected) {
+                //si une manette est connectée, contrôles manette
+
+                if (isOnSnow) { //différents paramètres selon la plateforme sur laquelle se trouve le joueur
+
+                    if (manette.A && player.body.touching.down) { //je n'ai pas trouvé de solution pour utiliser le double-saut en contrôle manette, j'ai cherché une alternative au "isDown" pour la classe Gamepas mais rien trouvé
+                        player.setVelocityY(-150);
+                    }
+
+                    else if (manette.leftStick.x < 0) {
+                        player.setVelocityX(-100);
+                        player.anims.play('left', true);
+                    }
+                    else if (manette.leftStick.x > 0) {
+                        player.setVelocityX(100);
+                        player.anims.play('right', true);
+                    }
+                    else { 
+                        player.setVelocityX(0);
+                        player.anims.play('turn');
+                    }
+                }
+
+                else if (isOnGround) {
+                    if (manette.A && player.body.touching.down) {
+                        player.setVelocityY(-250);
+                    }
+
+
+                    else if (manette.leftStick.x < 0) {
+                        player.setVelocityX(-200);
+                        player.anims.play('left', true);
+                    }
+                    else if (manette.leftStick.x > 0) {
+                        player.setVelocityX(200);
+                        player.anims.play('right', true);
+                    }
+                    else { 
+                        player.setVelocityX(0);
+                        player.anims.play('turn');
+                    }
+                }
+
+                else if (isOnIce) {
+                    if (manette.A && player.body.touching.down) {
+                        player.setVelocityY(-250);
+                    }
+                    else if (manette.leftStick.x < 0) {
+                        player.setVelocityX(-200);
+                        player.anims.play('left', true);
+                    }
+                    else if (manette.leftStick.x > 0) {
+                        player.setVelocityX(200);
+                        player.anims.play('right', true);
+                    }
+                    else {
+                        player.setVelocityX(50);
+                        player.anims.play('turn');
+                    }
+                }
+
+
+            }
+
+
+            else {
+                //sinon, contrôle clavier
+
+                if (isOnSnow) {
+                    if (cursors.Q.isDown) { 
+                        player.setVelocityX(-100); 
+                        player.anims.play('left', true); 
+                    }
+                    else if (cursors.D.isDown) { 
+                        player.setVelocityX(100);
+                        player.anims.play('right', true);
+                    }
+                    else {
+                        player.setVelocityX(0); 
+                        player.anims.play('turn'); 
+                    }
+
+                    if (glandCollected) {  //double-saut possible seulement si l'item a été récupéré
+                        doubleJumpKeyboard()
+                    }
+                    else {
+                        if (cursors.Z.isDown && player.body.touching.down) {                         
+                            player.setVelocityY(-150); 
+                        }
+                    }
+                }
+
+                else if (isOnIce) {
+                    if (cursors.Q.isDown) { 
+                        player.setVelocityX(-200); 
+                        player.anims.play('left', true); 
+                        pressLeft = true;
+                        pressRight = false;
+                    }
+                    else if (cursors.D.isDown) { 
+                        player.setVelocityX(200); 
+                        player.anims.play('right', true);
+                        pressLeft = false;
+                        pressRight = true;
+                    }
+                    else { 
+                        if (pressLeft) {
+                            player.setVelocityX(-50);
+                            player.anims.play('left'); 
+                        }
+                        else if (pressRight) {
+                            player.setVelocityX(50); 
+                            player.anims.play('turn'); 
+                        }
+                        else {
+                            player.setVelocityX(0);
+                            player.anims.play('turn'); 
+                        }
+
+                    }
+
+                    if (glandCollected) {
+                        doubleJumpKeyboard()
+                    }
+                    else {
+                        if (cursors.Z.isDown && player.body.touching.down) {
+                            player.setVelocityY(-250); 
+                        }
+                    }
+
+
+                }
+
+                else if (isOnGround) {
+                    if (cursors.Q.isDown) { 
+                        player.setVelocityX(-200); 
+                        player.anims.play('left', true); 
+                    }
+                    else if (cursors.D.isDown) { 
+                        player.setVelocityX(200);
+                        player.anims.play('right', true); 
+                    }
+                    else { // sinon
+                        player.setVelocityX(0);
+                        player.anims.play('turn');
+                    }
+
+                    if (glandCollected) { 
+                        doubleJumpKeyboard()
+                    }
+                    else {
+                        if (cursors.Z.isDown && player.body.touching.down) {
+                            player.setVelocityY(-250);
+                        }
+                    }
+
+                }
+
+            }
+
+        }
+
+    </script>
+</body>
+
+</html>
